@@ -237,13 +237,16 @@ def open_dataset(source, *, max_images: Optional[int]):
 
 #----------------------------------------------------------------------------
 
-def open_dest(dest: str) -> Tuple[str, Callable[[str, Union[bytes, str]], None], Callable[[], None]]:
+def open_dest(dest: str, compress:Optional[int] = None) -> Tuple[str, Callable[[str, Union[bytes, str]], None], Callable[[], None]]:
     dest_ext = file_ext(dest)
 
     if dest_ext == 'zip':
         if os.path.dirname(dest) != '':
             os.makedirs(os.path.dirname(dest), exist_ok=True)
-        zf = zipfile.ZipFile(file=dest, mode='w', compression=zipfile.ZIP_STORED)
+        zf = zipfile.ZipFile(file=dest, mode='w',
+                             compression=zipfile.ZIP_STORED if compress is None else zipfile.ZIP_DEFLATED,
+                             compresslevel=compress
+                             )
         def zip_write_bytes(fname: str, data: Union[bytes, str]):
             zf.writestr(fname, data)
         return '', zip_write_bytes, zf.close
@@ -278,6 +281,7 @@ def open_dest(dest: str) -> Tuple[str, Callable[[str, Union[bytes, str]], None],
 @click.option('--transform', help='Input crop/resize mode', type=click.Choice(['center-crop', 'center-crop-wide']))
 @click.option('--width', help='Output width', type=int)
 @click.option('--height', help='Output height', type=int)
+@click.option('--compress', help='ZIP compression level', type=int, default=None)
 def convert_dataset(
     ctx: click.Context,
     source: str,
@@ -286,7 +290,8 @@ def convert_dataset(
     transform: Optional[str],
     resize_filter: str,
     width: Optional[int],
-    height: Optional[int]
+    height: Optional[int],
+    compress: Optional[int]
 ):
     """Convert an image dataset into a dataset archive usable with StyleGAN2 ADA PyTorch.
 
@@ -332,7 +337,7 @@ def convert_dataset(
         ctx.fail('--dest output filename or directory must not be an empty string')
 
     num_files, input_iter = open_dataset(source, max_images=max_images)
-    archive_root_dir, save_bytes, close_dest = open_dest(dest)
+    archive_root_dir, save_bytes, close_dest = open_dest(dest, compress=compress)
 
     transform_image = make_transform(transform, width, height, resize_filter)
 
