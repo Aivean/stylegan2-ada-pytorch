@@ -9,18 +9,20 @@
 """Train a GAN using the techniques described in the paper
 "Training Generative Adversarial Networks with Limited Data"."""
 
-import os
-import click
-import re
 import json
+import os
+import re
 import tempfile
-import torch
-import dnnlib
 
-from training import training_loop
+import click
+import torch
+
+import dnnlib
 from metrics import metric_main
-from torch_utils import training_stats
 from torch_utils import custom_ops
+from torch_utils import training_stats
+from training import training_loop
+
 
 #----------------------------------------------------------------------------
 
@@ -303,9 +305,25 @@ def setup_training_loop_kwargs(
         'bgcfnc': dict(xflip=1, rotate90=1, xint=1, scale=1, rotate=1, aniso=1, xfrac=1, brightness=1, contrast=1, lumaflip=1, hue=1, saturation=1, imgfilter=1, noise=1, cutout=1),
     }
 
-    assert augpipe in augpipe_specs
+    if augpipe in augpipe_specs:
+        augpipe = augpipe_specs[augpipe]
+    else:
+        import json
+        try:
+            augpipe = json.loads(augpipe)
+        except:
+            print(f'augpipe must either be one of the predefined values: {list(augpipe_specs.keys())}')
+            print('or json in format: {"xflip":1, "rotate90":0.5}')
+            raise
+        assert isinstance(augpipe, dict)
+        valid_augs = {'xflip', 'rotate90', 'xint', 'scale', 'rotate', 'aniso', 'xfrac', 'brightness', 'contrast', 'lumaflip', 'hue', 'saturation', 'imgfilter', 'noise', 'cutout'}
+        for k,v in augpipe.items():
+            assert k in valid_augs, f'unknown augpipe key, valid keys are {valid_augs}'
+            assert isinstance(v, int) or isinstance(v, float), f'aug probability must be a number, got {k}:{v}'
+            assert v >= 0, f'aug probability must be non-negative, got {k}:{v}'
+
     if aug != 'noaug':
-        args.augment_kwargs = dnnlib.EasyDict(class_name='training.augment.AugmentPipe', **augpipe_specs[augpipe])
+        args.augment_kwargs = dnnlib.EasyDict(class_name='training.augment.AugmentPipe', **augpipe)
 
     # ----------------------------------
     # Transfer learning: resume, freezed
@@ -440,7 +458,7 @@ class CommaSeparatedList(click.ParamType):
 @click.option('--aug', help='Augmentation mode [default: ada]', type=click.Choice(['noaug', 'ada', 'fixed']))
 @click.option('--p', help='Augmentation probability for --aug=fixed', type=float)
 @click.option('--target', help='ADA target value for --aug=ada', type=float)
-@click.option('--augpipe', help='Augmentation pipeline [default: bgc]', type=click.Choice(['blit', 'geom', 'color', 'filter', 'noise', 'cutout', 'bg', 'bgc', 'bgcf', 'bgcfn', 'bgcfnc']))
+@click.option('--augpipe', help='Augmentation pipeline [default: bgc]. Either one of the predefined keys or json string.', type=str)
 
 # Transfer learning.
 @click.option('--resume', help='Resume training [default: noresume]', metavar='PKL')
