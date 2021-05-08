@@ -35,6 +35,7 @@ def setup_training_loop_kwargs(
     snap       = None, # Snapshot interval: <int>, default = 50 ticks
     metrics    = None, # List of metric names: [], ['fid50k_full'] (default), ...
     seed       = None, # Random seed: <int>, default = 0
+    ds_seed    = None, # Dataset random seed: <int>, default = seed
 
     # Dataset.
     data       = None, # Training dataset (required): <path>
@@ -98,6 +99,11 @@ def setup_training_loop_kwargs(
         seed = 0
     assert isinstance(seed, int)
     args.random_seed = seed
+
+    if ds_seed is None:
+        ds_seed = seed
+    assert isinstance(ds_seed, int)
+    args.dataset_seed = ds_seed
 
     # -----------------------------------
     # Dataset: data, cond, subset, mirror
@@ -413,6 +419,7 @@ class CommaSeparatedList(click.ParamType):
 @click.option('--snap', help='Snapshot interval [default: 50 ticks]', type=int, metavar='INT')
 @click.option('--metrics', help='Comma-separated list or "none" [default: fid50k_full]', type=CommaSeparatedList())
 @click.option('--seed', help='Random seed [default: 0]', type=int, metavar='INT')
+@click.option('--ds_seed', help='Dataset shuffle random seed [default: derived from seed]', type=int, metavar='INT')
 @click.option('-n', '--dry-run', help='Print training options and exit', is_flag=True)
 
 # Dataset.
