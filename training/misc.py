@@ -35,32 +35,23 @@ def parse_kimg_from_network_name(network_pickle_name):
 
 
 def parse_augment_p_from_log(network_pickle_name):
+    import re
 
+    augment_p = 0.0
     if network_pickle_name is not None:
         network_folder_name = os.path.dirname(network_pickle_name)
         log_file_name = network_folder_name + "/log.txt"
 
         try:
             with open(log_file_name, "r") as f:
-                # Tokenize each line starting with the word 'tick'
+                regex = re.compile("tick.*aug(ment)?\\s+([\\d.]+).*")
                 lines = [
-                    l.strip().split() for l in f.readlines() if l.startswith("tick")
+                    float(m.group(2)) for m in (regex.match(l) for l in f.readlines()) if m
                 ]
         except FileNotFoundError:
             lines = []
 
-        # Extract the last token of each line for which the second to last token is 'augment'
-        values = [
-            tokens[-1]
-            for tokens in lines
-            if len(tokens) > 1 and tokens[-2] == "augment"
-        ]
-
-        if len(values)>0:
-            augment_p = float(values[-1])
-        else:
-            augment_p = 0.0
-    else:
-        augment_p = 0.0
+        if len(lines) > 0:
+            augment_p = lines[-1]
 
     return float(augment_p)
