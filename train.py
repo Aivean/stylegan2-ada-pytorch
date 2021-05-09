@@ -321,7 +321,7 @@ def setup_training_loop_kwargs(
             print('or json in format: {"xflip":1, "rotate90":0.5}')
             raise
         assert isinstance(augpipe, dict)
-        valid_augs = {'xflip', 'rotate90', 'xint', 'scale', 'rotate', 'aniso', 'xfrac', 'brightness', 'contrast', 'lumaflip', 'hue', 'saturation', 'imgfilter', 'noise', 'cutout'}
+        valid_augs = {'xflip', 'rotate90', 'xint', 'xint_max', 'scale', 'rotate', 'aniso', 'xfrac', 'scale_std', 'rotate_max', 'aniso_std', 'xfrac_std', 'brightness', 'contrast', 'lumaflip', 'hue', 'saturation', 'brightness_std', 'contrast_std', 'hue_max', 'saturation_std', 'imgfilter', 'imgfilter_bands', 'imgfilter_std', 'noise', 'cutout', 'noise_std', 'cutout_size', 'cutout_value', 'pad_value'}
         for k,v in augpipe.items():
             assert k in valid_augs, f'unknown augpipe key, valid keys are {valid_augs}'
             assert isinstance(v, int) or isinstance(v, float), f'aug probability must be a number, got {k}:{v}'
