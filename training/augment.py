@@ -120,7 +120,7 @@ class AugmentPipe(torch.nn.Module):
         scale=0, rotate=0, aniso=0, xfrac=0, scale_std=0.2, rotate_max=1, aniso_std=0.2, xfrac_std=0.125,
         brightness=0, contrast=0, lumaflip=0, hue=0, saturation=0, brightness_std=0.2, contrast_std=0.5, hue_max=1, saturation_std=1,
         imgfilter=0, imgfilter_bands=[1,1,1,1], imgfilter_std=1,
-        noise=0, cutout=0, noise_std=0.1, cutout_size=0.5,
+        noise=0, cutout=0, noise_std=0.1, cutout_size=0.5, cutout_value=0, pad_value=None,
     ):
         super().__init__()
         self.register_buffer('p', torch.ones([]))       # Overall multiplier for augmentation probability.
@@ -162,6 +162,10 @@ class AugmentPipe(torch.nn.Module):
         self.cutout           = float(cutout)           # Probability multiplier for cutout.
         self.noise_std        = float(noise_std)        # Standard deviation of additive RGB noise.
         self.cutout_size      = float(cutout_size)      # Size of the cutout rectangle, relative to image dimensions.
+        self.cutout_value     = float(cutout_value)     # Value, used to fill the cutout area
+
+        # General settings
+        self.pad_value       = pad_value                # If None, reflection is used for pading. If not none, constant padding with this value is used
 
         # Setup orthogonal lowpass filter for geometric augmentations.
         self.register_buffer('Hz_geom', upfirdn2d.setup_filter(wavelets['sym6']))
@@ -283,7 +287,10 @@ class AugmentPipe(torch.nn.Module):
             mx0, my0, mx1, my1 = margin.ceil().to(torch.int32)
 
             # Pad image and adjust origin.
-            images = torch.nn.functional.pad(input=images, pad=[mx0,mx1,my0,my1], mode='reflect')
+            images = torch.nn.functional.pad(input=images, pad=[mx0,mx1,my0,my1],
+                                             mode='reflect' if self.pad_value is None else 'constant',
+                                             value=self.pad_value or 0
+                                             )
             G_inv = translate2d((mx0 - mx1) / 2, (my0 - my1) / 2) @ G_inv
 
             # Upsample.
@@ -425,6 +432,8 @@ class AugmentPipe(torch.nn.Module):
             mask_y = (((coord_y + 0.5) / height - center[:, 1]).abs() >= size[:, 1] / 2)
             mask = torch.logical_or(mask_x, mask_y).to(torch.float32)
             images = images * mask
+            if self.cutout_value != 0:
+                images += (1.0 - mask) * self.cutout_value
 
         return images
 
