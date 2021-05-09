@@ -289,12 +289,6 @@ def setup_training_loop_kwargs(
         args.ada_target = target
 
     assert augpipe is None or isinstance(augpipe, str)
-    if augpipe is None:
-        augpipe = 'bgc'
-    else:
-        if aug == 'noaug':
-            raise UserError('--augpipe cannot be specified with --aug=noaug')
-        desc += f'-{augpipe}'
 
     augpipe_specs = {
         'blit':   dict(xflip=1, rotate90=1, xint=1),
@@ -309,6 +303,16 @@ def setup_training_loop_kwargs(
         'bgcfn':  dict(xflip=1, rotate90=1, xint=1, scale=1, rotate=1, aniso=1, xfrac=1, brightness=1, contrast=1, lumaflip=1, hue=1, saturation=1, imgfilter=1, noise=1),
         'bgcfnc': dict(xflip=1, rotate90=1, xint=1, scale=1, rotate=1, aniso=1, xfrac=1, brightness=1, contrast=1, lumaflip=1, hue=1, saturation=1, imgfilter=1, noise=1, cutout=1),
     }
+
+    if augpipe is None:
+        augpipe = 'bgc'
+    else:
+        if aug == 'noaug':
+            raise UserError('--augpipe cannot be specified with --aug=noaug')
+        if augpipe in augpipe_specs:
+            desc += f'-{augpipe}'
+        else:
+            desc += '-custom_augpipe'
 
     if augpipe in augpipe_specs:
         augpipe = augpipe_specs[augpipe]
