@@ -6,8 +6,14 @@
 - automatically set the resume value of the augmentation strength,
 - allow to **manually** set the resume value of the augmentation strength,
 - add config `auto_norp` to replicate the `auto` config without EMA rampup,
-- allow to override mapping net depth with the command-line argument `--cfg_map`,
-- allow to enforce CIFAR-specific architecture tuning with the command-line argument `--cifar_tune`.
+- allow overriding mapping net depth with the command-line argument `--cfg_map`,
+- allow enforcing CIFAR-specific architecture tuning with the command-line argument `--cifar_tune`.
+- print D real/fake signs metric during training
+- override dataset random sampling seed separately to effectively shuffle the dataset on each training resume `--ds_seed` 
+- allow specifying custom `--augpipe` in json format
+- add `cutout_value` and `pad_value` parameters to augmentation pipline (control respective colors, and mode in case of padding)
+- allow specifying zip compression level in dataset tool (helps with limited disk space on colab)
+- allow overriding learning rate `--lr`
 
 ## StyleGAN2-ADA &mdash; Official PyTorch implementation
 
