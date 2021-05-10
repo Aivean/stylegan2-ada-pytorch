@@ -13,7 +13,7 @@
 - allow specifying custom `--augpipe` in json format
 - add `cutout_value` and `pad_value` parameters to augmentation pipline (control respective colors, and mode in case of padding)
 - allow specifying zip compression level in dataset tool (helps with limited disk space on colab)
-- allow overriding learning rate `--lr`
+- allow overriding learning rate `--lr` and, optionally, D learning rate `--dlr`
 
 ## StyleGAN2-ADA &mdash; Official PyTorch implementation
 
