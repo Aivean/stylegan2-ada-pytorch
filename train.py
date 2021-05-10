@@ -53,6 +53,7 @@ def setup_training_loop_kwargs(
     batch      = None, # Override batch size: <int>
     cfg_map    = None, # Override config map: <int>, default = depends on cfg
     lr         = None, # Override learning rate
+    dlr        = None, # Override D learning rate
 
     # Discriminator augmentation.
     aug        = None, # Augmentation mode: 'ada' (default), 'noaug', 'fixed'
@@ -187,6 +188,12 @@ def setup_training_loop_kwargs(
     if lr is not None:
         assert isinstance(lr, float) and lr > 0, 'Learning rate must be real positive value'
         spec.lrate = lr
+    if dlr is not None:
+        assert isinstance(dlr, float) and lr > 0, 'D learning rate must be real positive value'
+        spec.dlrate = dlr
+    else:
+        spec.dlrate = spec.lrate
+
 
     args.G_kwargs = dnnlib.EasyDict(class_name='training.networks.Generator', z_dim=512, w_dim=512, mapping_kwargs=dnnlib.EasyDict(), synthesis_kwargs=dnnlib.EasyDict())
     args.D_kwargs = dnnlib.EasyDict(class_name='training.networks.Discriminator', block_kwargs=dnnlib.EasyDict(), mapping_kwargs=dnnlib.EasyDict(), epilogue_kwargs=dnnlib.EasyDict())
@@ -198,7 +205,7 @@ def setup_training_loop_kwargs(
     args.D_kwargs.epilogue_kwargs.mbstd_group_size = spec.mbstd
 
     args.G_opt_kwargs = dnnlib.EasyDict(class_name='torch.optim.Adam', lr=spec.lrate, betas=[0,0.99], eps=1e-8)
-    args.D_opt_kwargs = dnnlib.EasyDict(class_name='torch.optim.Adam', lr=spec.lrate, betas=[0,0.99], eps=1e-8)
+    args.D_opt_kwargs = dnnlib.EasyDict(class_name='torch.optim.Adam', lr=spec.dlrate, betas=[0,0.99], eps=1e-8)
     args.loss_kwargs = dnnlib.EasyDict(class_name='training.loss.StyleGAN2Loss', r1_gamma=spec.gamma)
 
     args.total_kimg = spec.kimg
@@ -463,6 +470,7 @@ class CommaSeparatedList(click.ParamType):
 @click.option('--batch', help='Override batch size', type=int, metavar='INT')
 @click.option('--cfg_map', help='Override config map', type=int, metavar='INT')
 @click.option('--lr', help='Override learning rate', type=float)
+@click.option('--dlr', help='Override D learning rate', type=float)
 
 # Discriminator augmentation.
 @click.option('--aug', help='Augmentation mode [default: ada]', type=click.Choice(['noaug', 'ada', 'fixed']))
