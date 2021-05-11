@@ -16,6 +16,7 @@
 - allow overriding learning rate `--lr` and, optionally, D learning rate `--dlr`
 - allow overriding `--ada_kimg` (ada change speed)
 - allow specifying `--p_max`, that caps max value of ada `p`
+- allow specifying `--batch_gpu` separately from `--batch`
 
 ## StyleGAN2-ADA &mdash; Official PyTorch implementation
 

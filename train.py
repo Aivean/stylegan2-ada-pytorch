@@ -50,7 +50,8 @@ def setup_training_loop_kwargs(
     cifar_tune = None, # Enforce CIFAR-specific architecture tuning: <bool>, default = False
     gamma      = None, # Override R1 gamma: <float>
     kimg       = None, # Override training duration: <int>
-    batch      = None, # Override batch size: <int>
+    batch      = None, # Override batch size (images per gradient update): <int>
+    batch_gpu  = None, # Override per-gpu batch size (images processed at once on gpu): <int>
     cfg_map    = None, # Override config map: <int>, default = depends on cfg
     lr         = None, # Override learning rate
     dlr        = None, # Override D learning rate
@@ -249,6 +250,12 @@ def setup_training_loop_kwargs(
         desc += f'-batch{batch}'
         args.batch_size = batch
         args.batch_gpu = batch // gpus
+
+    if batch_gpu is not None:
+        assert isinstance(batch_gpu, int)
+        assert batch_gpu <= batch
+        desc += f'-batch_gpu{batch_gpu}'
+        args.batch_gpu = batch_gpu
 
     if cfg_map is not None:
         assert isinstance(cfg_map, int)
@@ -470,7 +477,8 @@ class CommaSeparatedList(click.ParamType):
 @click.option('--cifar_tune', help='Enforce CIFAR-specific architecture tuning (default: false)', type=bool, metavar='BOOL')
 @click.option('--gamma', help='Override R1 gamma', type=float)
 @click.option('--kimg', help='Override training duration', type=int, metavar='INT')
-@click.option('--batch', help='Override batch size', type=int, metavar='INT')
+@click.option('--batch', help='Override batch size (per grad update)', type=int, metavar='INT')
+@click.option('--batch_gpu', help='Override batch size (per gpu), [default: batch / num_gpus] ', type=int, metavar='INT')
 @click.option('--cfg_map', help='Override config map', type=int, metavar='INT')
 @click.option('--lr', help='Override learning rate', type=float)
 @click.option('--dlr', help='Override D learning rate', type=float)
