@@ -58,8 +58,10 @@ def setup_training_loop_kwargs(
     # Discriminator augmentation.
     aug        = None, # Augmentation mode: 'ada' (default), 'noaug', 'fixed'
     p          = None, # Specify p for 'fixed' (required): <float>
+    p_max      = None, # Specify cap for p (optional): <float>
     target     = None, # Override ADA target for 'ada': <float>, default = depends on aug
     augpipe    = None, # Augmentation pipeline: 'blit', 'geom', 'color', 'filter', 'noise', 'cutout', 'bg', 'bgc' (default), ..., 'bgcfnc'
+    ada_kimg   = None, # ADA reaction speed: number of kimg required to adjust ada p by 1.
 
     # Transfer learning.
     resume     = None, # Load previous network: 'noresume' (default), 'ffhq256', 'ffhq512', 'ffhq1024', 'celebahq256', 'lsundog256', <file>, <url>
@@ -266,14 +268,10 @@ def setup_training_loop_kwargs(
 
     if aug == 'ada':
         args.ada_target = 0.6
-
     elif aug == 'noaug':
         pass
-
     elif aug == 'fixed':
-        if p is None:
-            raise UserError(f'--aug={aug} requires specifying --p')
-
+        assert p is not None, f'--aug={aug} requires specifying --p'
     else:
         raise UserError(f'--aug={aug} not supported')
 
@@ -286,12 +284,20 @@ def setup_training_loop_kwargs(
         desc += f'-p{p:g}'
         args.augment_p = p
 
+    if p_max is not None:
+        assert isinstance(p_max, float)
+        args.augment_p_max = p_max
+
+    if ada_kimg is not None:
+        assert aug == 'ada', '--ada_kimg can be only used with --aug=ada'
+        assert isinstance(ada_kimg, int)
+        assert ada_kimg > 0
+        args.ada_kimg = ada_kimg
+
     if target is not None:
         assert isinstance(target, float)
-        if aug != 'ada':
-            raise UserError('--target can only be specified with --aug=ada')
-        if not 0 <= target <= 1:
-            raise UserError('--target must be between 0 and 1')
+        assert aug == 'ada', '--target can only be specified with --aug=ada'
+        assert 0 <= target <= 1, '--target must be between 0 and 1'
         desc += f'-target{target:g}'
         args.ada_target = target
 
@@ -314,8 +320,7 @@ def setup_training_loop_kwargs(
     if augpipe is None:
         augpipe = 'bgc'
     else:
-        if aug == 'noaug':
-            raise UserError('--augpipe cannot be specified with --aug=noaug')
+        assert aug != 'noaug', '--augpipe cannot be specified with --aug=noaug'
         if augpipe in augpipe_specs:
             desc += f'-{augpipe}'
         else:
@@ -328,9 +333,8 @@ def setup_training_loop_kwargs(
         try:
             augpipe = json.loads(augpipe)
         except:
-            print(f'augpipe must either be one of the predefined values: {list(augpipe_specs.keys())}')
-            print('or json in format: {"xflip":1, "rotate90":0.5}')
-            raise
+            raise UserError(f'augpipe must either be one of the predefined values: {list(augpipe_specs.keys())}\n' +
+                            'or json in format: {"xflip":1, "rotate90":0.5}')
         assert isinstance(augpipe, dict)
         valid_augs = {'xflip', 'rotate90', 'xint', 'xint_max', 'scale', 'rotate', 'aniso', 'xfrac', 'scale_std', 'rotate_max', 'aniso_std', 'xfrac_std', 'brightness', 'contrast', 'lumaflip', 'hue', 'saturation', 'brightness_std', 'contrast_std', 'hue_max', 'saturation_std', 'imgfilter', 'imgfilter_bands', 'imgfilter_std', 'noise', 'cutout', 'noise_std', 'cutout_size', 'cutout_value', 'pad_value'}
         for k,v in augpipe.items():
@@ -365,8 +369,7 @@ def setup_training_loop_kwargs(
         desc += '-resumecustom'
         args.resume_pkl = resume # custom path or url
 
-    if resume != 'noresume':
-        args.ada_kimg = 100 # make ADA react faster at the beginning
+    if resume != 'noresume' and resume != 'latest':
         args.ema_rampup = None # disable EMA rampup
 
     if freezed is not None:
@@ -474,8 +477,10 @@ class CommaSeparatedList(click.ParamType):
 
 # Discriminator augmentation.
 @click.option('--aug', help='Augmentation mode [default: ada]', type=click.Choice(['noaug', 'ada', 'fixed']))
-@click.option('--p', help='Augmentation probability for --aug=fixed', type=float)
+@click.option('--p', help='Augmentation probability for --aug=fixed, or starting probability for --aug=ada', type=float)
+@click.option('--p_max', help='Max cap for --p if --aug=ada [default: 1]', type=float)
 @click.option('--target', help='ADA target value for --aug=ada', type=float)
+@click.option('--ada_kimg', help='Number of kimg for ada to adjust p by 1. works only when--aug=ada [default: 500]', type=int)
 @click.option('--augpipe', help='Augmentation pipeline [default: bgc]. Either one of the predefined keys or json string.', type=str)
 
 # Transfer learning.

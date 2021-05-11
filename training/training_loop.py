@@ -108,6 +108,7 @@ def training_loop(
     G_reg_interval          = 4,        # How often to perform regularization for G? None = disable lazy regularization.
     D_reg_interval          = 16,       # How often to perform regularization for D? None = disable lazy regularization.
     augment_p               = 0,        # Initial value of augmentation probability.
+    augment_p_max           = 1,        # Max cap for augmentation probability.
     ada_target              = None,     # ADA target value. None = fixed p.
     ada_interval            = 4,        # How often to perform ADA adjustment?
     ada_kimg                = 500,      # ADA adjustment speed, measured in how many kimg it takes for p to increase/decrease by one unit.
@@ -326,7 +327,10 @@ def training_loop(
         if (ada_stats is not None) and (batch_idx % ada_interval == 0):
             ada_stats.update()
             adjust = np.sign(ada_stats['Loss/signs/real'] - ada_target) * (batch_size * ada_interval) / (ada_kimg * 1000)
-            augment_pipe.p.copy_((augment_pipe.p + adjust).max(misc.constant(0, device=device)))
+            p_adjusted = (augment_pipe.p + adjust).max(misc.constant(0, device=device))
+            if augment_p_max is not None:
+                p_adjusted = p_adjusted.min(misc.constant(augment_p_max, device=device))
+            augment_pipe.p.copy_(p_adjusted)
 
         # Perform maintenance tasks once per tick.
         done = (cur_nimg >= total_kimg * 1000)
@@ -436,5 +440,3 @@ def training_loop(
     if rank == 0:
         print()
         print('Exiting...')
-
-#----------------------------------------------------------------------------

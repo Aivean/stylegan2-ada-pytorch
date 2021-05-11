@@ -14,6 +14,8 @@
 - add `cutout_value` and `pad_value` parameters to augmentation pipline (control respective colors, and mode in case of padding)
 - allow specifying zip compression level in dataset tool (helps with limited disk space on colab)
 - allow overriding learning rate `--lr` and, optionally, D learning rate `--dlr`
+- allow overriding `--ada_kimg` (ada change speed)
+- allow specifying `--p_max`, that caps max value of ada `p`
 
 ## StyleGAN2-ADA &mdash; Official PyTorch implementation
 
