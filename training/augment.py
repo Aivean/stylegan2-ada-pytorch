@@ -117,10 +117,12 @@ def rotate2d_inv(theta, **kwargs):
 class AugmentPipe(torch.nn.Module):
     def __init__(self,
         xflip=0, rotate90=0, xint=0, xint_max=0.125,
-        scale=0, rotate=0, aniso=0, xfrac=0, scale_std=0.2, rotate_max=1, aniso_std=0.2, xfrac_std=0.125,
+        scale=0, rotate=0, aniso=0, xfrac=0, scale_std=0.2, scale_min=0, rotate_max=1, aniso_std=0.2, xfrac_std=0.125,
         brightness=0, contrast=0, lumaflip=0, hue=0, saturation=0, brightness_std=0.2, contrast_std=0.5, hue_max=1, saturation_std=1,
         imgfilter=0, imgfilter_bands=[1,1,1,1], imgfilter_std=1,
         noise=0, cutout=0, noise_std=0.1, cutout_size=0.5, cutout_value=0, pad_value=None,
+        rmasks=0, rmasks_ds=None, rmasks_value=0, rmasks_scale_min=0.08, rmasks_scale_max=2,
+        top_crop=0, top_crop_max_scale=0.2
     ):
         super().__init__()
         self.register_buffer('p', torch.ones([]))       # Overall multiplier for augmentation probability.
@@ -137,6 +139,7 @@ class AugmentPipe(torch.nn.Module):
         self.aniso            = float(aniso)            # Probability multiplier for anisotropic scaling.
         self.xfrac            = float(xfrac)            # Probability multiplier for fractional translation.
         self.scale_std        = float(scale_std)        # Log2 standard deviation of isotropic scaling.
+        self.scale_min        = float(scale_min)        # min value of the scale
         self.rotate_max       = float(rotate_max)       # Range of arbitrary rotation, 1 = full circle.
         self.aniso_std        = float(aniso_std)        # Log2 standard deviation of anisotropic scaling.
         self.xfrac_std        = float(xfrac_std)        # Standard deviation of frational translation, relative to image dimensions.
@@ -182,12 +185,46 @@ class AugmentPipe(torch.nn.Module):
             Hz_fbank[i, (Hz_fbank.shape[1] - Hz_hi2.size) // 2 : (Hz_fbank.shape[1] + Hz_hi2.size) // 2] += Hz_hi2
         self.register_buffer('Hz_fbank', torch.as_tensor(Hz_fbank, dtype=torch.float32))
 
+        self.rmasks = rmasks
+        if rmasks_ds is not None and rmasks != 0:
+            from training.dataset import ImageFolderDataset
+            mask_dataset = ImageFolderDataset(rmasks_ds)
+            masks_idx = np.random.choice(len(mask_dataset), 1024)
+            masks = np.asarray([mask_dataset[i][0].squeeze() for i in masks_idx])
+
+            self.register_buffer('rmasks_ds', torch.as_tensor(masks, dtype=torch.uint8), persistent=False)
+            self.rmasks_value = rmasks_value
+            self.rmasks_scale_min = rmasks_scale_min
+            self.rmasks_scale_max = rmasks_scale_max
+        else:
+            self.rmasks = 0
+
+        self.top_crop = top_crop
+        self.top_crop_max_scale = top_crop_max_scale
+
     def forward(self, images, debug_percentile=None):
         assert isinstance(images, torch.Tensor) and images.ndim == 4
         batch_size, num_channels, height, width = images.shape
         device = images.device
         if debug_percentile is not None:
             debug_percentile = torch.as_tensor(debug_percentile, dtype=torch.float32, device=device)
+
+        if self.rmasks != 0:
+            i = (torch.rand([batch_size, 1, 1], device=device) < self.rmasks * self.p).to(torch.float32)
+
+            import torchvision.transforms as trf
+            from torchvision.transforms.functional import InterpolationMode
+            num_rmasks = self.rmasks_ds.shape[0]
+            masks = self.rmasks_ds[torch.randint(num_rmasks, (batch_size,))]
+            masks = trf.RandomAffine(360, interpolation=InterpolationMode.BILINEAR, fill=255)(masks)
+            masks = trf.RandomResizedCrop((height, width), scale=(self.rmasks_scale_min, self.rmasks_scale_max),
+                                          interpolation=InterpolationMode.BILINEAR)(masks)
+            masks = (masks > torch.randint(255, (batch_size, 1, 1), device=device)).to(torch.float32)
+            masks = 1 - (1 - masks) * i
+            masks = torch.unsqueeze(masks, 1)
+            images = images * masks
+            if self.rmasks_value != 0:
+                images += (1.0 - masks) * self.rmasks_value
 
         # -------------------------------------
         # Select parameters for pixel blitting.
@@ -196,6 +233,16 @@ class AugmentPipe(torch.nn.Module):
         # Initialize inverse homogeneous 2D transform: G_inv @ pixel_out ==> pixel_in
         I_3 = torch.eye(3, device=device)
         G_inv = I_3
+
+
+        if self.top_crop != 0:
+            i = torch.rand([batch_size], device=device) * (1 - self.top_crop_max_scale) + self.top_crop_max_scale
+            i = torch.where(torch.rand([batch_size], device=device) < self.top_crop * self.p, i, torch.ones_like(i))
+            if debug_percentile is not None:
+                i = torch.full_like(i, debug_percentile)
+            G_inv = G_inv @ scale2d_inv(1/i, 1/i)
+            G_inv = G_inv @ translate2d_inv(0, torch.floor((1/i - 1) * height / 2))
+
 
         # Apply x-flip with probability (xflip * strength).
         if self.xflip > 0:
@@ -229,6 +276,8 @@ class AugmentPipe(torch.nn.Module):
         if self.scale > 0:
             s = torch.exp2(torch.randn([batch_size], device=device) * self.scale_std)
             s = torch.where(torch.rand([batch_size], device=device) < self.scale * self.p, s, torch.ones_like(s))
+            if self.scale_min != 0:
+                s = torch.maximum(s, misc.constant([self.scale_min], device=device))
             if debug_percentile is not None:
                 s = torch.full_like(s, torch.exp2(torch.erfinv(debug_percentile * 2 - 1) * self.scale_std))
             G_inv = G_inv @ scale2d_inv(s, s)

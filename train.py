@@ -343,11 +343,13 @@ def setup_training_loop_kwargs(
             raise UserError(f'augpipe must either be one of the predefined values: {list(augpipe_specs.keys())}\n' +
                             'or json in format: {"xflip":1, "rotate90":0.5}')
         assert isinstance(augpipe, dict)
-        valid_augs = {'xflip', 'rotate90', 'xint', 'xint_max', 'scale', 'rotate', 'aniso', 'xfrac', 'scale_std', 'rotate_max', 'aniso_std', 'xfrac_std', 'brightness', 'contrast', 'lumaflip', 'hue', 'saturation', 'brightness_std', 'contrast_std', 'hue_max', 'saturation_std', 'imgfilter', 'imgfilter_bands', 'imgfilter_std', 'noise', 'cutout', 'noise_std', 'cutout_size', 'cutout_value', 'pad_value'}
+        valid_augs = {'xflip', 'rotate90', 'xint', 'xint_max', 'scale', 'rotate', 'aniso', 'xfrac', 'scale_std', 'rotate_max', 'aniso_std', 'xfrac_std', 'brightness', 'contrast', 'lumaflip', 'hue', 'saturation', 'brightness_std', 'contrast_std', 'hue_max', 'saturation_std', 'imgfilter', 'imgfilter_bands', 'imgfilter_std', 'noise', 'cutout', 'noise_std', 'cutout_size', 'cutout_value', 'pad_value',
+                      'scale_min', 'rmasks', 'rmasks_ds', 'rmasks_value', 'rmasks_scale_min', 'rmasks_scale_max', 'top_crop', 'top_crop_max_scale' }
         for k,v in augpipe.items():
             assert k in valid_augs, f'unknown augpipe key, valid keys are {valid_augs}'
-            assert isinstance(v, int) or isinstance(v, float), f'aug probability must be a number, got {k}:{v}'
-            assert v >= 0, f'aug probability must be non-negative, got {k}:{v}'
+            if k != 'rmasks_ds':
+                assert isinstance(v, int) or isinstance(v, float), f'aug probability must be a number, got {k}:{v}'
+                assert v >= 0, f'aug probability must be non-negative, got {k}:{v}'
 
     if aug != 'noaug':
         args.augment_kwargs = dnnlib.EasyDict(class_name='training.augment.AugmentPipe', **augpipe)
